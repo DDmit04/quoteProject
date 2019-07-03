@@ -9,10 +9,18 @@ import 'vue-awesome/icons'
 import Icon from 'vue-awesome/components/Icon.vue'
 import VueResize from 'vue-resize'
 import 'vue-resize/dist/vue-resize.css'
+import VeeValidate from 'vee-validate'
 
 
 Vue.use(VueResize)
 
+Vue.use(VeeValidate, {
+    classes: true,
+    classNames: {
+        valid: 'is-valid',
+        invalid: 'is-invalid'
+    }
+})
 
 Vue.use(BootstrapVue)
 Vue.component('icon', Icon)
