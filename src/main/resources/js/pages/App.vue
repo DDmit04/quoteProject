@@ -7,19 +7,25 @@
                 </li>
             </div>
             <ul class="nav justify-content-end">
-<!--                <feedbackModal/>-->
+                <feedbackModal/>
             </ul>
         </nav>
             <div class="row mt-2 mx-4">
-                <button class="btn btn-primary mt-2" @click="getPervQuote" :disabled="!canPrevQuote">perv quote</button>
+                <button class="btn btn-primary mt-2"
+                        @click="getPervQuote"
+                        :disabled="!canPrevQuote">
+                    perv quote
+                </button>
                 <h3 class="col mt-3 mx-4">
-                    <b-spinner v-if='loading'></b-spinner>
+                    <b-spinner v-if="loading"></b-spinner>
                     <div v-else-if="appError">
                         что то-то пошло не так, повторите запрос позже
                     </div>
                     <div v-else class="text-area">
                         {{quoteText}}
-                        @ {{quoteAuthor}}
+                        <div>
+                            @ {{quoteAuthor}}
+                        </div>
                     </div>
                 </h3>
                 <button class="btn btn-primary mt-2" @click="getNextQuote">next quote</button>
@@ -27,76 +33,87 @@
     </div>
 </template>
 <script>
-    import forismaticApi from '../api/quotesBase'
+    import forismaticApi from '../api/quotesApi'
+    import feedbackModal from '../components/feedbackModal.vue'
 
     export default {
         data() {
             return {
                 selectedQuote: -1,
                 quotes: [],
-                loading: true,
                 appError: false
             }
+        },
+        components: {
+            feedbackModal
         },
         computed: {
             quoteText: {
                 get() {
-                    return this.quotes[this.selectedQuote].quoteText
-                },
-                set() {}
+                    return this.quotes[this.selectedQuote].data.quoteText
+                }
             },
             quoteAuthor: {
                 get() {
-                    let quoteAuthor = this.quotes[this.selectedQuote].quoteAuthor
-                    if(quoteAuthor == '') {
-                        quoteAuthor = 'неизвестный'
+                    let author = this.quotes[this.selectedQuote].data.quoteAuthor
+                    if(author == '') {
+                        author = 'неизвестный'
                     }
-                    return quoteAuthor
+                    return author
                 },
-                set() {}
+            },
+            loading: {
+                get() {
+                    return this.quotes[this.selectedQuote].data == null
+                },
             },
             canPrevQuote: {
                 get() {
                     let pervQuoteIndex = this.selectedQuote - 1
                     return pervQuoteIndex >= 0 && this.quotes[pervQuoteIndex] != null
                 },
-                set() {}
             }
         },
-        mounted: function() {
+        created: function() {
           this.getNextQuote()
         },
         methods: {
+            checkQuoteCount() {
+                if(this.quotes.length > 9) {
+                    this.quotes.shift()
+                    this.selectedQuote--
+                }
+            },
             getPervQuote() {
                 if(this.canPrevQuote) {
                     this.selectedQuote--
                 }
             },
-            async getNextQuote(){
-                this.updateCounters()
-                if(this.quotes[this.selectedQuote] == null) {
-                    this.downloadQuote()
-                } else {
-                    this.selectedQuote++
-                }
-            },
-            async downloadQuote() {
-                const response = await forismaticApi.get({
-                    method: 'getQuote',
-                    format: 'json',
-                    lang: 'ru'
-                })
-                const data = await response.json()
-                this.quotes.push(data)
-                this.loading = false
-                if (!response.ok) {
-                    this.appError = true
-                }
-            },
-            updateCounters() {
+            getNextQuote(){
                 this.selectedQuote++
-                this.loading = true
-            }
+                this.checkQuoteCount()
+                if(this.quotes[this.selectedQuote] == null) {
+                    this.downloadQuote(this.selectedQuote)
+                }
+            },
+            async downloadQuote(selectedQuote) {
+                let key = this.randomKey()
+                this.quotes.push ({
+                    data: null
+                })
+                let request = {
+                        method: 'getQuote',
+                        format: 'json',
+                        lang: 'ru',
+                        key: key
+                }
+                const response = await forismaticApi.get(request)
+                const data = await response.json()
+                this.quotes[selectedQuote].data = data
+            },
+            randomKey() {
+                return Math.floor(Math.random() * 999999)
+            },
         }
     }
 </script>
