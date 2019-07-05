@@ -159,6 +159,11 @@
                     this.currentSelectedQuote--
                 }
             },
+            checkUsedKeysCount() {
+                if(this.currentUsedKeys.length > 30) {
+                    this.currentUsedKeys.shift()
+                }
+            },
             getPervQuote() {
                 if(this.canPrevQuote) {
                     this.currentSelectedQuote--
@@ -167,6 +172,7 @@
             getNextQuote(){
                 this.currentSelectedQuote++
                 this.checkQuoteCount()
+                this.checkUsedKeysCount()
                 if(this.currentQuotes[this.currentSelectedQuote] == null) {
                     this.downloadQuote(this.currentSelectedQuote)
                 }
@@ -185,9 +191,23 @@
                 const data = await response.json()
                 this.currentQuotes[selectedQuote].data = data
             },
-            randomKey() {
-                return Math.floor(Math.random() * 999999)
+            generateKey() {
+                let generatedKey = Math.floor(Math.random() * 999999)
+                if(this.keyIsOriginal(generatedKey)) {
+                    this.currentUsedKeys.push(generatedKey)
+                } else {
+                    generatedKey = this.generateKey()
+                }
+                return generatedKey
             },
+            keyIsOriginal(generatedKey) {
+                for(let i = 0; i < this.currentUsedKeys.length; i++) {
+                    if(this.currentUsedKeys[i] === generatedKey) {
+                        return false
+                    }
+                }
+                return true
+            }
         }
     }
 </script>
