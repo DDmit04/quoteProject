@@ -3,7 +3,19 @@
         <nav class='navbar navbar-expand-lg navbar-primary navbar-default bg-light scrolling-navbar shadow'>
             <div class='navbar-nav mr-auto'>
                 <li class='nav-item'>
-                    <a class="navbar-brand">Orderly Chaos</a>
+                    <a class="navbar-brand">Quotes</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link"
+                       :class="{ 'disabled': quotesLanguage === 'ru'}"
+                       href="javascript:void(0)"
+                       @click="quotesLanguage = 'ru'">ru</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link"
+                       :class="{ 'disabled': quotesLanguage === 'en'}"
+                       href="javascript:void(0)"
+                       @click="quotesLanguage = 'en'">eng</a>
                 </li>
             </div>
             <ul class="nav justify-content-end">
@@ -24,7 +36,9 @@
                     <div v-else class="text-area">
                         {{quoteText}}
                         <div>
-                            @ {{quoteAuthor}}
+                            <a :href="wikiRef">
+                                <i>{{quoteAuthor}}</i>
+                            </a>
                         </div>
                     </div>
                 </h3>
@@ -39,77 +53,137 @@
     export default {
         data() {
             return {
-                selectedQuote: -1,
-                quotes: [],
-                appError: false
+                ruWikiRef: 'https://ru.wikipedia.org/wiki/',
+                engWikiRef: 'https://en.wikipedia.org/wiki/',
+                currentWikiRef: 'https://ru.wikipedia.org/wiki/',
+                quotesLanguage: 'ru',
+                currentSelectedQuote: -1,
+                selectedEngQuote: -1,
+                selectedRuQuote: -1,
+                currentQuotes: [],
+                ruQuotes: [],
+                engQuotes: [],
+                appError: false,
+                currentUsedKeys: [],
+                usedRuKeys: [],
+                usedEngKeys: []
             }
         },
         components: {
             feedbackModal
         },
-        computed: {
-            quoteText: {
-                get() {
-                    return this.quotes[this.selectedQuote].data.quoteText
+        created: function() {
+            if(this.quotesLanguage === 'ru') {
+                this.loadRuData()
+            } else if(this.quotesLanguage === 'en') {
+                this.loadEngData()
+            }
+            this.getNextQuote()
+        },
+        watch: {
+            quotesLanguage(newVal) {
+                if(newVal === 'ru') {
+                    this.currentWikiRef = this.ruWikiRef
+                    this.saveEngData()
+                    this.loadRuData()
+                } else if(newVal === 'en'){
+                    this.currentWikiRef = this.engWikiRef
+                    this.saveRuData()
+                    this.loadEngData()
                 }
+                if(this.selectedRuQuote === -1 && newVal === 'ru') {
+                    this.getNextQuote()
+                }
+                if(this.selectedEngQuote === -1 && newVal === 'en') {
+                    this.getNextQuote()
+                }
+            }
+        },
+        computed: {
+            wikiRef: {
+                get() {
+                    let author = this.currentQuotes[this.currentSelectedQuote].data.quoteAuthor
+                    if(author === '') {
+                        return void(0)
+                    } else {
+                        return this.currentWikiRef + author.split(' ').join('_')
+                    }
+                },
+            },
+            quoteText: {
+                get() { return this.currentQuotes[this.currentSelectedQuote].data.quoteText }
             },
             quoteAuthor: {
                 get() {
-                    let author = this.quotes[this.selectedQuote].data.quoteAuthor
-                    if(author == '') {
+                    let author = this.currentQuotes[this.currentSelectedQuote].data.quoteAuthor
+                    if(author === '') {
                         author = 'неизвестный'
                     }
                     return author
                 },
             },
             loading: {
-                get() {
-                    return this.quotes[this.selectedQuote].data == null
-                },
+                get() { return this.currentQuotes[this.currentSelectedQuote].data == null },
             },
             canPrevQuote: {
                 get() {
-                    let pervQuoteIndex = this.selectedQuote - 1
-                    return pervQuoteIndex >= 0 && this.quotes[pervQuoteIndex] != null
+                    let pervQuoteIndex = this.currentSelectedQuote - 1
+                    return pervQuoteIndex >= 0 && this.currentQuotes[pervQuoteIndex] != null
                 },
             }
         },
-        created: function() {
-          this.getNextQuote()
-        },
         methods: {
+            saveEngData() {
+                this.selectedEngQuote = this.currentSelectedQuote
+                this.engQuotes = this.currentQuotes
+                this.usedEngKeys = this.currentUsedKeys
+            },
+            loadEngData() {
+                this.currentSelectedQuote = this.selectedEngQuote
+                this.currentQuotes = this.engQuotes
+                this.currentUsedKeys = this.usedEngKeys
+            },
+            saveRuData() {
+                this.selectedRuQuote = this.currentSelectedQuote
+                this.ruQuotes = this.currentQuotes
+                this.usedRuKeys = this.currentUsedKeys
+            },
+            loadRuData() {
+                this.currentSelectedQuote = this.selectedRuQuote
+                this.currentQuotes = this.ruQuotes
+                this.currentUsedKeys = this.usedRuKeys
+            },
             checkQuoteCount() {
-                if(this.quotes.length > 9) {
-                    this.quotes.shift()
-                    this.selectedQuote--
+                if(this.currentQuotes.length > 9) {
+                    this.currentQuotes.shift()
+                    this.currentSelectedQuote--
                 }
             },
             getPervQuote() {
                 if(this.canPrevQuote) {
-                    this.selectedQuote--
+                    this.currentSelectedQuote--
                 }
             },
             getNextQuote(){
-                this.selectedQuote++
+                this.currentSelectedQuote++
                 this.checkQuoteCount()
-                if(this.quotes[this.selectedQuote] == null) {
-                    this.downloadQuote(this.selectedQuote)
+                if(this.currentQuotes[this.currentSelectedQuote] == null) {
+                    this.downloadQuote(this.currentSelectedQuote)
                 }
             },
             async downloadQuote(selectedQuote) {
-                let key = this.randomKey()
-                this.quotes.push ({
+                this.currentQuotes.push ({
                     data: null
                 })
                 let request = {
                         method: 'getQuote',
                         format: 'json',
-                        lang: 'ru',
-                        key: key
+                        lang: this.quotesLanguage,
+                        key: this.generateKey()
                 }
                 const response = await forismaticApi.get(request)
                 const data = await response.json()
-                this.quotes[selectedQuote].data = data
+                this.currentQuotes[selectedQuote].data = data
             },
             randomKey() {
                 return Math.floor(Math.random() * 999999)
