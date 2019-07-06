@@ -6,20 +6,18 @@
                     <a class="navbar-brand">Quotes</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link"
-                       :class="{ 'disabled': quotesLanguage === 'ru'}"
-                       href="javascript:void(0)"
-                       @click="quotesLanguage = 'ru'">ru</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link"
-                       :class="{ 'disabled': quotesLanguage === 'en'}"
-                       href="javascript:void(0)"
-                       @click="quotesLanguage = 'en'">eng</a>
+                    <b-form-select v-model="quotesLanguage" :options="languageOptions"></b-form-select>
                 </li>
             </div>
             <ul class="nav justify-content-end">
-                <feedbackModal/>
+                <li clas="nav-item">
+                    <feedbackModal/>
+                </li>
+                <li clas="nav-item">
+                    <div class="navbar-text">
+                        {{user == null ? "unknown" : user.name}}
+                    </div>
+                </li>
             </ul>
         </nav>
             <div class="row mt-2 mx-4">
@@ -31,13 +29,13 @@
                 <h3 class="col mt-3 mx-4">
                     <b-spinner v-if="loading"></b-spinner>
                     <div v-else-if="appError">
-                        что то-то пошло не так, повторите запрос позже
+                        something go wrong :(
                     </div>
                     <div v-else class="text-area">
                         {{quoteText}}
                         <div>
                             <a :href="wikiRef">
-                                <i>{{quoteAuthor}}</i>
+                                <i class="mt-2">{{quoteAuthor}}</i>
                             </a>
                         </div>
                     </div>
@@ -49,6 +47,7 @@
 <script>
     import forismaticApi from '../api/quotesApi'
     import feedbackModal from '../components/feedbackModal.vue'
+    import {mapState} from 'vuex'
 
     export default {
         data() {
@@ -57,6 +56,7 @@
                 engWikiRef: 'https://en.wikipedia.org/wiki/',
                 currentWikiRef: 'https://ru.wikipedia.org/wiki/',
                 quotesLanguage: 'ru',
+                languageOptions: ['ru', 'en'],
                 currentSelectedQuote: -1,
                 selectedEngQuote: -1,
                 selectedRuQuote: -1,
@@ -100,6 +100,7 @@
             }
         },
         computed: {
+            ...mapState(['user']),
             wikiRef: {
                 get() {
                     let author = this.currentQuotes[this.currentSelectedQuote].data.quoteAuthor

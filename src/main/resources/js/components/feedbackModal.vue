@@ -1,8 +1,6 @@
 <template>
     <div>
-        <li class="nav-item">
-            <a class="nav-link active" v-b-modal.modal-1 href='javascript:void(0)'>feedback</a>
-        </li>
+        <a class="nav-link active" v-b-modal.modal-1 href='javascript:void(0)'>feedback</a>
         <b-modal id="modal-1"
                  size="lg"
                  title="send feedback"
