@@ -20,8 +20,8 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
         http
             .antMatcher("/**")
             .authorizeRequests()
-            .antMatchers("/", "/login**", "/js/**", "/error**", "/static/**", "/feedback", "/download",
-                    "https://cors-anywhere.herokuapp.com/**").permitAll()
+            .antMatchers("/", "/login**", "/js/**", "/error**", "/static/**", "/feedback",
+                    "/quotes/apiQuote", "/quotes/userQuote", "https://cors-anywhere.herokuapp.com/**").permitAll()
             .anyRequest().authenticated()
             .and().logout().logoutSuccessUrl("/").permitAll()
             .and()

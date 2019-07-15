@@ -15,37 +15,86 @@
                 </li>
                 <li clas="nav-item">
                     <div class="navbar-text">
-                        {{user == null ? "unknown" : user.name}}
+                        <div v-if="user == null">
+                            unknown
+                            <a href="/login">login</a>
+                        </div>
+                        <div v-else>
+                            {{user.name}}
+                            <a href="/logout">logout</a>
+                        </div>
                     </div>
                 </li>
             </ul>
         </nav>
-            <div class="row mt-2 mx-4">
-                <button class="btn btn-primary mt-2"
-                        @click="getPervQuote"
-                        :disabled="!canPrevQuote">
-                    perv quote
+        <div class="row mt-2 mx-4">
+            <button class="btn btn-primary mt-2"
+                    @click="getPervQuote"
+                    :disabled="!canPrevQuote">
+                perv quote
+            </button>
+            <h3 class="col mt-3 mx-4">
+                <b-spinner v-if="!quoteDataIsReady"></b-spinner>
+                <div v-else-if="appError">
+                    something go wrong :(
+                </div>
+                <div v-else class="text-area">
+                    {{quoteText}}
+                    <div>
+                        <a :href="wikiRef">
+                            <i class="mt-2">{{quoteAuthor}}</i>
+                        </a>
+                    </div>
+                </div>
+            </h3>
+            <button class="btn btn-primary mt-2" @click="getNextQuote">next quote</button>
+        </div>
+        <div class="row">
+            <div class="col mt-2 text-center">
+                <button class="btn btn-primary btn-block my-2"
+                        v-if="!alwaysDownloadRates"
+                        @click="downloadQuoteRates()"
+                        :disabled="!quoteDataIsReady">
+                    <div v-if="!quoteRatesIsReady">
+                        download rates
+                    </div>
+                    <div v-else>
+                        update rates
+                    </div>
                 </button>
-                <h3 class="col mt-3 mx-4">
-                    <b-spinner v-if="loading"></b-spinner>
-                    <div v-else-if="appError">
-                        something go wrong :(
+                <div v-if="(!alwaysDownloadRates && downloadRatesButtonIsPressed) || alwaysDownloadRates">
+                    <b-spinner type="grow" v-if="!quoteRatesIsReady"></b-spinner>
+                    <div v-else>
+                        <button class="btn btn-success btn-lg" @click="rateQuote('like')">
+                            like
+                            <span class="badge badge-light">
+                                {{currentQuotes[currentSelectedQuote].rates.plusesCount}}
+                            </span>
+                        </button>
+                        <button class="btn btn-warning btn-lg" @click="rateQuote('medium')">
+                            medium
+                            <span class="badge badge-light">
+                                {{currentQuotes[currentSelectedQuote].rates.mediumCount}}
+                            </span>
+                        </button>
+                        <button class="btn btn-danger btn-lg" @click="rateQuote('minus')">
+                            minus
+                            <span class="badge badge-light">
+                                {{currentQuotes[currentSelectedQuote].rates.minusesCount}}
+                            </span>
+                        </button>
+                        <b-form-checkbox class="mt-2" v-model="alwaysDownloadRates">
+                            always download rates
+                        </b-form-checkbox>
                     </div>
-                    <div v-else class="text-area">
-                        {{quoteText}}
-                        <div>
-                            <a :href="wikiRef">
-                                <i class="mt-2">{{quoteAuthor}}</i>
-                            </a>
-                        </div>
-                    </div>
-                </h3>
-                <button class="btn btn-primary mt-2" @click="getNextQuote">next quote</button>
+                </div>
             </div>
+        </div>
     </div>
 </template>
 <script>
     import forismaticApi from '../api/quotesApi'
+    import DBApi from '../api/ApiQuoteToMyServerApi'
     import feedbackModal from '../components/feedbackModal.vue'
     import {mapState} from 'vuex'
 
@@ -66,7 +115,8 @@
                 appError: false,
                 currentUsedKeys: [],
                 usedRuKeys: [],
-                usedEngKeys: []
+                usedEngKeys: [],
+                alwaysDownloadRates: true
             }
         },
         components: {
@@ -123,17 +173,57 @@
                     return author
                 },
             },
-            loading: {
-                get() { return this.currentQuotes[this.currentSelectedQuote].data == null },
+            quoteDataIsReady: {
+                get() { return this.currentQuotes[this.currentSelectedQuote].data != null },
+            },
+            quoteRatesIsReady: {
+                get() { return this.currentQuotes[this.currentSelectedQuote].rates != null },
+            },
+            downloadRatesButtonIsPressed: {
+                get() { return this.currentQuotes[this.currentSelectedQuote].downloadRatesButton }
             },
             canPrevQuote: {
                 get() {
                     let pervQuoteIndex = this.currentSelectedQuote - 1
-                    return pervQuoteIndex >= 0 && this.currentQuotes[pervQuoteIndex] != null
+                    return (pervQuoteIndex >= 0 && this.currentQuotes[pervQuoteIndex] != null)
                 },
             }
         },
         methods: {
+            checkPervPushedRate() {
+                let pervPushedRate = this.currentQuotes[this.currentSelectedQuote].pushedRate
+                if(pervPushedRate === 'like') {
+                    this.currentQuotes[this.currentSelectedQuote].rates.plusesCount--
+                } else if(pervPushedRate === 'medium') {
+                    this.currentQuotes[this.currentSelectedQuote].rates.mediumCount--
+                } else if(pervPushedRate === 'minus') {
+                    this.currentQuotes[this.currentSelectedQuote].rates.minusesCount--
+                }
+            },
+            async rateQuote(rateType) {
+                let method
+                if(rateType === 'like') {
+                    this.checkPervPushedRate()
+                    this.currentQuotes[this.currentSelectedQuote].rates.plusesCount++
+                    this.currentQuotes[this.currentSelectedQuote].pushedRate = 'like'
+                    method = DBApi.plusApiQuote
+                } else if(rateType === 'medium') {
+                    this.checkPervPushedRate()
+                    this.currentQuotes[this.currentSelectedQuote].rates.mediumCount++
+                    this.currentQuotes[this.currentSelectedQuote].pushedRate = 'medium'
+                    method = DBApi.medApiQuote
+                } else if(rateType === 'minus') {
+                    this.checkPervPushedRate()
+                    this.currentQuotes[this.currentSelectedQuote].rates.minusesCount++
+                    this.currentQuotes[this.currentSelectedQuote].pushedRate = 'minus'
+                    method = DBApi.minusApiQuote
+                } else {
+                    console.error('unknown rates type - ' + rateType)
+                }
+                const response = await method(this.currentQuotes[this.currentSelectedQuote].id)
+                const rates = await response.json()
+                this.currentQuotes[this.currentSelectedQuote].rates = rates
+            },
             saveEngData() {
                 this.selectedEngQuote = this.currentSelectedQuote
                 this.engQuotes = this.currentQuotes
@@ -175,25 +265,47 @@
                 this.checkQuoteCount()
                 this.checkUsedKeysCount()
                 if(this.currentQuotes[this.currentSelectedQuote] == null) {
-                    this.downloadQuote(this.currentSelectedQuote)
+                    this.downloadApiQuote(this.currentSelectedQuote)
                 }
             },
-            async downloadQuote(selectedQuote) {
+            async downloadApiQuote(selectedQuote) {
                 this.currentQuotes.push ({
-                    data: null
+                    data: null,
+                    rates: null,
+                    pushedRate: null,
+                    id: null,
+                    downloadRatesButton: false
                 })
                 let request = {
-                        method: 'getQuote',
-                        format: 'json',
-                        lang: this.quotesLanguage,
-                        key: this.generateKey()
+                    method: 'getQuote',
+                    format: 'json',
+                    lang: this.quotesLanguage,
+                    key: this.generateKey()
                 }
                 const response = await forismaticApi.get(request)
                 const data = await response.json()
                 this.currentQuotes[selectedQuote].data = data
+                if(this.alwaysDownloadRates) {
+                    await this.downloadQuoteRates()
+                }
+            },
+            async downloadQuoteRates() {
+                this.currentQuotes[this.currentSelectedQuote].downloadRatesButton = true
+                this.currentQuotes[this.currentSelectedQuote].rates = null
+                let quoteData = this.currentQuotes[this.currentSelectedQuote].data
+                quoteData.quoteLanguage = this.quotesLanguage
+                const response = await DBApi.save(quoteData)
+                const data = await response.json()
+                this.currentQuotes[this.currentSelectedQuote].id = data.quoteId
+                let metrics = {
+                    plusesCount: data.plusesCount,
+                    mediumCount: data.mediumCount,
+                    minusesCount: data.minusesCount
+                }
+                this.currentQuotes[this.currentSelectedQuote].rates = metrics
             },
             generateKey() {
-                let generatedKey = Math.floor(Math.random() * 999999)
+                let generatedKey = Math.floor(Math.random() * 99999)
                 if(this.keyIsOriginal(generatedKey)) {
                     this.currentUsedKeys.push(generatedKey)
                 } else {
