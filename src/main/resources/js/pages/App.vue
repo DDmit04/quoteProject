@@ -6,7 +6,10 @@
                     <a class="navbar-brand">Quotes</a>
                 </li>
                 <li class="nav-item">
-                    <b-form-select v-model="quotesLanguage" :options="languageOptions"></b-form-select>
+                    <b-form-select :value="quotesLanguage"
+                                   :options="languageOptions"
+                                   @input="changeQuotesLanguage">
+                    </b-form-select>
                 </li>
             </div>
             <ul class="nav justify-content-end">
@@ -35,9 +38,6 @@
             </button>
             <h3 class="col mt-3 mx-4">
                 <b-spinner v-if="!quoteDataIsReady"></b-spinner>
-                <div v-else-if="appError">
-                    something go wrong :(
-                </div>
                 <div v-else class="text-area">
                     {{quoteText}}
                     <div>
@@ -65,7 +65,7 @@
                 <div v-if="(!alwaysDownloadRates && downloadRatesButtonIsPressed) || alwaysDownloadRates">
                     <b-spinner type="grow" v-if="!quoteRatesIsReady"></b-spinner>
                     <div v-else>
-                        <button class="btn btn-success btn-lg" @click="rateQuote('like')">
+                        <button class="btn btn-success btn-lg" @click="rateQuote('plus')">
                             like
                             <span class="badge badge-light">
                                 {{currentQuotes[currentSelectedQuote].rates.plusesCount}}
@@ -96,23 +96,12 @@
     import forismaticApi from '../api/quotesApi'
     import DBApi from '../api/ApiQuoteToMyServerApi'
     import feedbackModal from '../components/feedbackModal.vue'
-    import {mapState} from 'vuex'
+    import {mapState, mapMutations} from 'vuex'
 
     export default {
         data() {
             return {
-                ruWikiRef: 'https://ru.wikipedia.org/wiki/',
-                engWikiRef: 'https://en.wikipedia.org/wiki/',
-                currentWikiRef: 'https://ru.wikipedia.org/wiki/',
-                quotesLanguage: 'ru',
                 languageOptions: ['ru', 'en'],
-                currentSelectedQuote: -1,
-                selectedEngQuote: -1,
-                selectedRuQuote: -1,
-                currentQuotes: [],
-                ruQuotes: [],
-                engQuotes: [],
-                appError: false,
                 currentUsedKeys: [],
                 usedRuKeys: [],
                 usedEngKeys: [],
@@ -130,124 +119,138 @@
             }
             this.getNextQuote()
         },
-        watch: {
-            quotesLanguage(newVal) {
-                if(newVal === 'ru') {
-                    this.currentWikiRef = this.ruWikiRef
-                    this.saveEngData()
-                    this.loadRuData()
-                } else if(newVal === 'en'){
-                    this.currentWikiRef = this.engWikiRef
-                    this.saveRuData()
-                    this.loadEngData()
-                }
-                if(this.selectedRuQuote === -1 && newVal === 'ru') {
-                    this.getNextQuote()
-                }
-                if(this.selectedEngQuote === -1 && newVal === 'en') {
-                    this.getNextQuote()
-                }
-            }
-        },
         computed: {
-            ...mapState(['user']),
-            wikiRef: {
-                get() {
-                    let author = this.currentQuotes[this.currentSelectedQuote].data.quoteAuthor
-                    if(author === '') {
-                        return void(0)
-                    } else {
-                        return this.currentWikiRef + author.split(' ').join('_')
-                    }
-                },
-            },
-            quoteText: {
-                get() { return this.currentQuotes[this.currentSelectedQuote].data.quoteText }
-            },
-            quoteAuthor: {
-                get() {
-                    let author = this.currentQuotes[this.currentSelectedQuote].data.quoteAuthor
-                    if(author === '') {
+            ...mapState(['user', 'currentQuotes', 'currentQuotes', 'currentSelectedQuote',
+                        'selectedRuQuote', 'selectedEngQuote', 'quotesLanguage']),
+            quoteAuthor() {
+                let author = this.currentQuotes[this.currentSelectedQuote].data.quoteAuthor
+                if(author === '') {
+                    if(this.quotesLanguage === 'ru') {
                         author = 'неизвестный'
                     }
-                    return author
-                },
+                    if(this.quotesLanguage === 'en') {
+                        author = 'unknown'
+                    }
+                }
+                return author
             },
-            quoteDataIsReady: {
-                get() { return this.currentQuotes[this.currentSelectedQuote].data != null },
+            wikiRef() {
+                let author = this.currentQuotes[this.currentSelectedQuote].data.quoteAuthor
+                if(author === '') {
+                    return void(0)
+                } else {
+                    return this.currentWikiRef + author.split(' ').join('_')
+                }
             },
-            quoteRatesIsReady: {
-                get() { return this.currentQuotes[this.currentSelectedQuote].rates != null },
-            },
-            downloadRatesButtonIsPressed: {
-                get() { return this.currentQuotes[this.currentSelectedQuote].downloadRatesButton }
-            },
-            canPrevQuote: {
-                get() {
-                    let pervQuoteIndex = this.currentSelectedQuote - 1
-                    return (pervQuoteIndex >= 0 && this.currentQuotes[pervQuoteIndex] != null)
-                },
+            quoteText() { return  this.currentQuotes[this.currentSelectedQuote].data.quoteText },
+            quoteDataIsReady() { return this.currentQuotes[this.currentSelectedQuote].data != null },
+            quoteRatesIsReady() { return this.currentQuotes[this.currentSelectedQuote].rates != null },
+            downloadRatesButtonIsPressed() { return this.currentQuotes[this.currentSelectedQuote].downloadRatesButton },
+            canPrevQuote() {
+                let pervQuoteIndex = this.currentSelectedQuote - 1
+                return (pervQuoteIndex >= 0 && this.currentQuotes[pervQuoteIndex] != null)
             }
         },
         methods: {
+            ...mapMutations(['loadEngDataMutation', 'loadRuDataMutation', 'saveEngDataMutation',
+                'saveRuDataMutation', 'decrementCurrentSelectedQuoteMutation',
+                'incrementCurrentSelectedQuoteMutation', 'changeQuoteRatesMutation',
+                'changeLastPushedRateMutation', 'updateQuoteRateMutation',
+                'shiftCurrentQuotesMutation', 'pushNewQuoteMutation', 'setQuoteDataMutation',
+                'refreshQuoteRatesMutation', 'updateQuoteIdMutation', 'updateQuoteRatesMutation',
+                'changeCurrentWikiRefMutation', 'changeQuotesLanguageMutation']),
+            changeQuotesLanguage(newVal) {
+                this.changeQuotesLanguageMutation(newVal)
+                this.changeCurrentWikiRefMutation(newVal)
+                if (newVal === 'ru') {
+                    this.saveEngData()
+                    this.loadRuData()
+                }
+                if (newVal === 'en') {
+                    this.saveRuData()
+                    this.loadEngData()
+                }
+                if (this.selectedRuQuote === -1 && newVal === 'ru') {
+                    this.getNextQuote()
+                }
+                if (this.selectedEngQuote === -1 && newVal === 'en') {
+                    this.getNextQuote()
+                }
+            },
             checkPervPushedRate() {
                 let pervPushedRate = this.currentQuotes[this.currentSelectedQuote].pushedRate
-                if(pervPushedRate === 'like') {
-                    this.currentQuotes[this.currentSelectedQuote].rates.plusesCount--
+                if(pervPushedRate === 'plus') {
+                    let payload = {
+                        count: -1,
+                        rateType: pervPushedRate,
+                    }
+                    this.changeQuoteRatesMutation(payload)
                 } else if(pervPushedRate === 'medium') {
-                    this.currentQuotes[this.currentSelectedQuote].rates.mediumCount--
+                    let payload = {
+                        count: -1,
+                        rateType: pervPushedRate,
+                    }
+                    this.changeQuoteRatesMutation(payload)
                 } else if(pervPushedRate === 'minus') {
-                    this.currentQuotes[this.currentSelectedQuote].rates.minusesCount--
+                    let payload = {
+                        count: -1,
+                        rateType: pervPushedRate,
+                    }
+                    this.changeQuoteRatesMutation(payload)
                 }
             },
             async rateQuote(rateType) {
                 let method
-                if(rateType === 'like') {
+                if(rateType === 'plus') {
                     this.checkPervPushedRate()
-                    this.currentQuotes[this.currentSelectedQuote].rates.plusesCount++
-                    this.currentQuotes[this.currentSelectedQuote].pushedRate = 'like'
+                    let payload = {
+                        count: 1,
+                        rateType: rateType,
+                    }
+                    this.changeQuoteRatesMutation(payload)
+                    this.changeLastPushedRateMutation(rateType)
                     method = DBApi.plusApiQuote
                 } else if(rateType === 'medium') {
                     this.checkPervPushedRate()
-                    this.currentQuotes[this.currentSelectedQuote].rates.mediumCount++
-                    this.currentQuotes[this.currentSelectedQuote].pushedRate = 'medium'
+                    let payload = {
+                        count: 1,
+                        rateType: rateType,
+                    }
+                    this.changeQuoteRatesMutation(payload)
+                    this.changeLastPushedRateMutation(rateType)
                     method = DBApi.medApiQuote
                 } else if(rateType === 'minus') {
                     this.checkPervPushedRate()
-                    this.currentQuotes[this.currentSelectedQuote].rates.minusesCount++
-                    this.currentQuotes[this.currentSelectedQuote].pushedRate = 'minus'
+                    let payload = {
+                        count: 1,
+                        rateType: rateType,
+                    }
+                    this.changeQuoteRatesMutation(payload)
+                    this.changeLastPushedRateMutation(rateType)
                     method = DBApi.minusApiQuote
                 } else {
                     console.error('unknown rates type - ' + rateType)
                 }
                 const response = await method(this.currentQuotes[this.currentSelectedQuote].id)
                 const rates = await response.json()
-                this.currentQuotes[this.currentSelectedQuote].rates = rates
+                this.updateQuoteRateMutation(rates)
             },
             saveEngData() {
-                this.selectedEngQuote = this.currentSelectedQuote
-                this.engQuotes = this.currentQuotes
-                this.usedEngKeys = this.currentUsedKeys
+                this.saveEngDataMutation()
             },
             loadEngData() {
-                this.currentSelectedQuote = this.selectedEngQuote
-                this.currentQuotes = this.engQuotes
-                this.currentUsedKeys = this.usedEngKeys
+                this.loadEngDataMutation()
             },
             saveRuData() {
-                this.selectedRuQuote = this.currentSelectedQuote
-                this.ruQuotes = this.currentQuotes
-                this.usedRuKeys = this.currentUsedKeys
+                this.saveRuDataMutation()
             },
             loadRuData() {
-                this.currentSelectedQuote = this.selectedRuQuote
-                this.currentQuotes = this.ruQuotes
-                this.currentUsedKeys = this.usedRuKeys
+                this.loadRuDataMutation()
             },
             checkQuoteCount() {
                 if(this.currentQuotes.length > 9) {
-                    this.currentQuotes.shift()
-                    this.currentSelectedQuote--
+                    this.shiftCurrentQuotesMutation()
+                    this.decrementCurrentSelectedQuoteMutation()
                 }
             },
             checkUsedKeysCount() {
@@ -257,11 +260,11 @@
             },
             getPervQuote() {
                 if(this.canPrevQuote) {
-                    this.currentSelectedQuote--
+                    this.decrementCurrentSelectedQuoteMutation()
                 }
             },
             getNextQuote(){
-                this.currentSelectedQuote++
+                this.incrementCurrentSelectedQuoteMutation()
                 this.checkQuoteCount()
                 this.checkUsedKeysCount()
                 if(this.currentQuotes[this.currentSelectedQuote] == null) {
@@ -269,40 +272,45 @@
                 }
             },
             async downloadApiQuote(selectedQuote) {
-                this.currentQuotes.push ({
+                let quote = {
                     data: null,
                     rates: null,
                     pushedRate: null,
                     id: null,
                     downloadRatesButton: false
-                })
+                }
+                this.pushNewQuoteMutation(quote)
                 let request = {
                     method: 'getQuote',
                     format: 'json',
                     lang: this.quotesLanguage,
                     key: this.generateKey()
                 }
+                console.log(this.quotesLanguage)
                 const response = await forismaticApi.get(request)
                 const data = await response.json()
-                this.currentQuotes[selectedQuote].data = data
+                let payload = {
+                    data: data,
+                    selectedQuote: selectedQuote
+                }
+                this.setQuoteDataMutation(payload)
                 if(this.alwaysDownloadRates) {
                     await this.downloadQuoteRates()
                 }
             },
             async downloadQuoteRates() {
-                this.currentQuotes[this.currentSelectedQuote].downloadRatesButton = true
-                this.currentQuotes[this.currentSelectedQuote].rates = null
+                this.refreshQuoteRatesMutation()
                 let quoteData = this.currentQuotes[this.currentSelectedQuote].data
                 quoteData.quoteLanguage = this.quotesLanguage
                 const response = await DBApi.save(quoteData)
                 const data = await response.json()
-                this.currentQuotes[this.currentSelectedQuote].id = data.quoteId
-                let metrics = {
+                this.updateQuoteIdMutation(data.quoteId)
+                let rates = {
                     plusesCount: data.plusesCount,
                     mediumCount: data.mediumCount,
                     minusesCount: data.minusesCount
                 }
-                this.currentQuotes[this.currentSelectedQuote].rates = metrics
+                this.updateQuoteRatesMutation(rates)
             },
             generateKey() {
                 let generatedKey = Math.floor(Math.random() * 99999)
