@@ -56,6 +56,7 @@
 
 <script>
     import api from '../api/feedback'
+    import {mapState} from 'vuex'
 
     export default {
         name: "feedbackModal",
@@ -68,10 +69,16 @@
                 feedbackEmail: '',
             }
         },
-        computed: {
-          validate() {
-              return this.validateEmail(this.feedbackEmail) && this.feedbackText != ''
+        created() {
+          if(this.user != null) {
+              this.feedbackEmail = this.user.email
           }
+        },
+        computed: {
+            ...mapState(['user']),
+            validate() {
+                return this.validateEmail(this.feedbackEmail) && this.feedbackText != ''
+            }
         },
         methods: {
             async sendFeedback() {
