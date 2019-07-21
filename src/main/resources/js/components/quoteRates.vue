@@ -3,7 +3,7 @@
         <div class="col mt-2 text-center">
             <button class="btn btn-primary btn-block my-2"
                     v-if="!alwaysDownloadRates"
-                    @click="downloadQuoteRatesAction()"
+                    @click="downloadQuoteRatesAction(currentSelectedQuote)"
                     :disabled="!quoteDataIsReady">
                 <div v-if="!quoteRatesIsReady">
                     download rates
@@ -15,22 +15,22 @@
             <div v-if="(!alwaysDownloadRates && downloadRatesButtonIsPressed) || alwaysDownloadRates">
                 <b-spinner type="grow" v-if="!quoteRatesIsReady"></b-spinner>
                 <div v-else>
-                    <button class="btn btn-success btn-lg" @click="rateQuote('plus')">
+                    <button :disabled="!userExists" class="btn btn-success btn-lg" @click="rateQuote('plus')">
                         like
                         <span class="badge badge-light">
-                                {{currentQuotes[currentSelectedQuote].rates.plusesCount}}
+                                {{quotePluses}}
                             </span>
                     </button>
-                    <button class="btn btn-warning btn-lg" @click="rateQuote('medium')">
+                    <button :disabled="!userExists" class="btn btn-warning btn-lg" @click="rateQuote('medium')">
                         medium
                         <span class="badge badge-light">
-                                {{currentQuotes[currentSelectedQuote].rates.mediumCount}}
+                                {{quoteMedium}}
                             </span>
                     </button>
-                    <button class="btn btn-danger btn-lg" @click="rateQuote('minus')">
+                    <button :disabled="!userExists" class="btn btn-danger btn-lg" @click="rateQuote('minus')">
                         minus
                         <span class="badge badge-light">
-                                {{currentQuotes[currentSelectedQuote].rates.minusesCount}}
+                                {{quoteMinuses}}
                             </span>
                     </button>
                     <b-form-checkbox class="mt-2" v-model="alwaysDownloadRates">
@@ -49,14 +49,16 @@
         name: "quoteRates",
         computed: {
             ...mapState('quotes', ['currentQuotes', 'currentSelectedQuote']),
-            ...mapGetters('quotes', ['currentQuote']),
+            ...mapGetters(['userExists']),
+            ...mapGetters('quotes', ['currentQuote', 'quoteDataIsReady',
+                                    'quoteRatesIsReady', 'downloadRatesButtonIsPressed']),
+            quotePluses() { return this.currentQuotes[this.currentSelectedQuote].rates.plusesCount },
+            quoteMedium() { return this.currentQuotes[this.currentSelectedQuote].rates.mediumCount },
+            quoteMinuses() { return this.currentQuotes[this.currentSelectedQuote].rates.minusesCount },
             alwaysDownloadRates: {
                 get() { return this.$store.state.alwaysDownloadRates },
                 set(newVal) { this.changeRatesFlagMutation(newVal) }
             },
-            quoteDataIsReady() { return this.currentQuote.data != null },
-            quoteRatesIsReady() { return this.currentQuote.rates != null },
-            downloadRatesButtonIsPressed() { return this.currentQuote.downloadRatesButton },
         },
         methods: {
             ...mapActions('quotes', ['downloadQuoteRatesAction',

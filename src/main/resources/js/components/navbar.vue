@@ -39,7 +39,6 @@
 
     export default {
         name: "languageSelect",
-        props: ['getNextQuote'],
         components: {
             feedbackModal
         },
@@ -54,15 +53,15 @@
         },
         methods: {
             ...mapMutations(['changeCurrentWikiRefMutation']),
-            ...mapActions('quotes', ['changeQuotesLanguageAction']),
+            ...mapActions('quotes', ['changeQuotesLanguageAction', 'getNextQuoteAction']),
             changeQuotesLanguage(newVal) {
                 this.changeCurrentWikiRefMutation(newVal)
                 this.changeQuotesLanguageAction(newVal)
                 if (this.selectedRuQuote === -1 && newVal === 'ru') {
-                    this.getNextQuote()
+                    this.getNextQuoteAction(0)
                 }
                 if (this.selectedEngQuote === -1 && newVal === 'en') {
-                    this.getNextQuote()
+                    this.getNextQuoteAction(0)
                 }
             },
         }

@@ -1,6 +1,6 @@
-import forismaticApi from "../../api/quotesApi";
-import DBApi from "../../api/ApiQuoteToMyServerApi";
-
+import forismaticApi from "../../api/quotesApi"
+import DBApi from "../../api/ApiQuoteToMyServerApi"
+import generateKey from "../../helpers/quoteHelpers"
 const state = {
     currentQuotes: [],
     ruQuotes: [],
@@ -15,7 +15,29 @@ const state = {
     usedEngKeys: [],
 }
 const getters = {
-    currentQuote: state => state.currentQuotes[state.currentSelectedQuote]
+    currentQuote: state => state.currentQuotes[state.currentSelectedQuote],
+    quoteDataIsReady: (state, getters) => {
+        if(getters.currentQuote != null) {
+            return getters.currentQuote.data != null
+        } else {
+            return false
+        }
+    },
+    quoteRatesIsReady: (state, getters) => {
+        if(getters.currentQuote != null) {
+            return getters.currentQuote.rates != null
+        } else {
+            return false
+        }
+    },
+    downloadRatesButtonIsPressed: (state, getters) =>  {
+        if(getters.currentQuote != null) {
+            return getters.currentQuote.downloadRatesButton
+        } else {
+            return false
+        }
+    },
+
 }
 const mutations = {
     saveEngDataMutation(state) {
@@ -75,14 +97,14 @@ const mutations = {
         state.currentQuotes.push(quote)
     },
     setQuoteDataMutation(state, payload) {
-        state.currentQuotes[payload.selectedQuote].data = payload.data
+            state.currentQuotes[payload.selectedQuote].data = payload.data
     },
     refreshQuoteRatesMutation(state) {
         state.currentQuotes[state.currentSelectedQuote].downloadRatesButton = true
         state.currentQuotes[state.currentSelectedQuote].rates = null
     },
-    updateQuoteRatesMutation(state, rates) {
-        state.currentQuotes[state.currentSelectedQuote].rates = rates
+    updateQuoteRatesMutation(state, payload) {
+        state.currentQuotes[payload.selectedQuote].rates = payload.rates
     },
     updateQuoteIdMutation(state, id) {
         state.currentQuotes[state.currentSelectedQuote].id = id
@@ -103,27 +125,38 @@ const actions = {
             commit('loadEngDataMutation')
         }
     },
-    async downloadApiQuoteAction({commit, dispatch, rootState}, payload) {
+    getNextQuoteAction({state, getters, commit, dispatch}) {
+        commit('incrementCurrentSelectedQuoteMutation')
+        dispatch('checkQuoteCountAction')
+        dispatch('checkUsedKeysCountAction')
+        if(getters.currentQuote == null) {
+            dispatch('downloadApiQuoteAction', state.currentSelectedQuote)
+        }
+    },
+    async downloadApiQuoteAction({commit, dispatch, rootState}, selectedQuote) {
+        commit('pushNewQuoteMutation')
+        let key = generateKey(state.currentUsedKeys)
+        commit('pushCurrentUsedKeyMutation', key)
         let request = {
             method: 'getQuote',
+            key: key,
             format: 'json',
             lang: rootState.quotesLanguage,
-            key: payload.key
         }
         const response = await forismaticApi.get(request)
         const data = await response.json()
         let quoteData = {
             data: data,
-            selectedQuote: payload.selectedQuote
+            selectedQuote: selectedQuote
         }
         commit('setQuoteDataMutation', quoteData)
         if(rootState.alwaysDownloadRates) {
-            dispatch('downloadQuoteRatesAction')
+            await dispatch('downloadQuoteRatesAction', selectedQuote)
         }
     },
-    async downloadQuoteRatesAction({state, commit, rootState}) {
+    async downloadQuoteRatesAction({state, commit, rootState}, selectedQuote) {
         commit('refreshQuoteRatesMutation')
-        let quoteData = state.currentQuotes[state.currentSelectedQuote].data
+        let quoteData = state.currentQuotes[selectedQuote].data
         quoteData.quoteLanguage = rootState.quotesLanguage
         const response = await DBApi.save(quoteData)
         const data = await response.json()
@@ -132,10 +165,14 @@ const actions = {
             mediumCount: data.mediumCount,
             minusesCount: data.minusesCount
         }
+        let ratePayload = {
+            rates: rates,
+            selectedQuote: selectedQuote
+        }
         commit('updateQuoteIdMutation', data.quoteId)
-        commit('updateQuoteRatesMutation', rates)
+        commit('updateQuoteRatesMutation', ratePayload)
     },
-    async rateQuoteAction({state, commit}, rateType) {
+    async rateQuoteAction({state, commit, getters}, rateType) {
         let method
         let payload = {
             count: 1,
@@ -152,19 +189,33 @@ const actions = {
         } else {
             console.error('unknown rates type - ' + rateType)
         }
-        const response = await method(state.currentQuotes[state.currentSelectedQuote].id)
+        const response = await method(getters.currentQuote.id)
         const rates = await response.json()
-        commit('updateQuoteRatesMutation', rates)
+        let ratePayload = {
+            rates: rates,
+            selectedQuote: state.currentSelectedQuote
+        }
+        commit('updateQuoteRatesMutation', ratePayload)
     },
-    checkPervPushedRateAction({state, commit}) {
-        let pervPushedRate = state.currentQuotes[state.currentSelectedQuote].pushedRate
+    checkPervPushedRateAction({getters, commit}) {
+        let pervPushedRate = getters.currentQuote.pushedRate
         let payload = {
             count: -1,
             rateType: pervPushedRate,
         }
         commit('changeQuoteRatesMutation', payload)
     },
-
+    checkQuoteCountAction({state, commit}) {
+        if(state.currentQuotes.length > 9) {
+            commit('shiftCurrentQuotesMutation')
+            commit('decrementCurrentSelectedQuoteMutation')
+        }
+    },
+    checkUsedKeysCountAction({state, commit}) {
+        if(state.currentUsedKeys.length > 30) {
+            commit('shiftCurrentUsedKeyMutation')
+        }
+    },
 }
 
 export default {

@@ -8,6 +8,7 @@ import * as Cookie from 'js-cookie'
 Vue.use(Vuex)
 
 export default new Vuex.Store({
+    strict: true,
     state: {
         user: userAuth,
         ruWikiRef: 'https://ru.wikipedia.org/wiki/',
@@ -26,7 +27,9 @@ export default new Vuex.Store({
     modules: {
         quotes
     },
-    getters: {},
+    getters: {
+        userExists: state => (state.user != null)
+    },
     mutations: {
         changeQuotesLanguageMutation(state, newLanguage) {
             state.quotesLanguage = newLanguage

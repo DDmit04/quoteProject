@@ -27,20 +27,19 @@
 
     export default {
         name: "quotes",
-        props: ['getNextQuote'],
         created: function() {
             if(this.quotesLanguage === 'ru') {
-                this.loadRuData()
+                this.loadRuDataMutation()
             } else if(this.quotesLanguage === 'en') {
-                this.loadEngData()
+                this.loadEngDataMutation()
             }
             if(this.currentQuotes.length == 0 && this.currentSelectedQuote == -1) {
-                this.getNextQuote()
+                this.getNextQuoteAction()
             }
         },
         computed: {
             ...mapState('quotes', ['currentQuotes', 'currentUsedKeys', 'currentSelectedQuote']),
-            ...mapGetters('quotes', ['currentQuote']),
+            ...mapGetters('quotes', ['currentQuote', 'quoteDataIsReady', 'quoteRatesIsReady']),
             quoteAuthor() {
                 let author = this.currentQuote.data.quoteAuthor
                 if(author === '') {
@@ -53,6 +52,7 @@
                 }
                 return author
             },
+            quoteText() { return this.currentQuote.data.quoteText },
             wikiRef() {
                 let author = this.quoteAuthor
                 if(author === '' || author === 'неизвестный' || author === 'unknown') {
@@ -61,9 +61,6 @@
                     return this.currentWikiRef + author.split(' ').join('_')
                 }
             },
-            quoteText() { return this.currentQuote.data.quoteText },
-            quoteDataIsReady() { return this.currentQuote.data != null },
-            quoteRatesIsReady() { return this.currentQuote.rates != null },
             canPrevQuote() {
                 let pervQuoteIndex = this.currentSelectedQuote - 1
                 return (pervQuoteIndex >= 0 && this.currentQuotes[pervQuoteIndex] != null)
@@ -72,12 +69,9 @@
         methods: {
             ...mapMutations('quotes', ['decrementCurrentSelectedQuoteMutation', 'loadEngDataMutation',
                                         'loadRuDataMutation']),
-            ...mapActions('quotes', ['downloadApiQuoteAction', 'downloadQuoteRatesAction']),
-            loadEngData() {
-                this.loadEngDataMutation()
-            },
-            loadRuData() {
-                this.loadRuDataMutation()
+            ...mapActions('quotes', ['downloadQuoteRatesAction', 'getNextQuoteAction']),
+            getNextQuote() {
+                this.getNextQuoteAction
             },
             getPervQuote() {
                 if(this.canPrevQuote) {
